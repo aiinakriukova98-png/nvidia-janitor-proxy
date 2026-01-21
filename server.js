@@ -61,7 +61,7 @@ app.post("/v1/chat/completions", async (req, res) => {
       {
         model: nimModel,
         messages,
-        temperature: temperature ?? 0.7,
+        temperature: temperature ?? 0.95,
         max_tokens: max_tokens ?? 8192,
         stream: stream ?? false,
         // thinking включаем ВСЕГДА — DeepSeek это умеет
