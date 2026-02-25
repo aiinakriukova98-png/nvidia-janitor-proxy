@@ -18,8 +18,8 @@ const NIM_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
 // Правая часть — ТОЧНОЕ имя модели NVIDIA
 const MODEL_MAPPING = {
   "deepseek-3.2": "deepseek-ai/deepseek-v3.2",
-  "deepseek-3.1": "deepseek-ai/deepseek-v3.1",
-  "deepseek-3.1-terminus": "deepseek-ai/deepseek-v3.1-terminus"
+  "glm4.7": "z-ai/glm4.7",
+  "glm5": "z-ai/glm5"
 };
 
 // Health check
