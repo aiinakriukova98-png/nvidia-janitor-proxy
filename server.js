@@ -1,4 +1,4 @@
-// server.js — строгий Janitor → NVIDIA NIM proxy (DeepSeek only)
+// server.js — Janitor → NVIDIA NIM proxy (DeepSeek / GLM with thinking toggle)
 
 const express = require("express");
 const axios = require("axios");
@@ -13,13 +13,42 @@ const PORT = process.env.PORT || 3000;
 const NIM_API_KEY = process.env.NIM_API_KEY;
 const NIM_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
 
-// ⛔ СТРОГОЕ СОПОСТАВЛЕНИЕ МОДЕЛЕЙ
-// Левая часть — ЧТО ты пишешь в Janitor
-// Правая часть — ТОЧНОЕ имя модели NVIDIA
+/*
+  MODEL_MAPPING:
+  Ключ — что ты выбираешь в Janitor
+  id — точное имя модели NVIDIA
+  thinking — включён ли reasoning режим
+*/
 const MODEL_MAPPING = {
-  "deepseek-3.2": "deepseek-ai/deepseek-v3.2",
-  "glm4.7": "z-ai/glm4.7",
-  "glm5": "z-ai/glm5"
+  // DeepSeek
+  "deepseek-3.2": {
+    id: "deepseek-ai/deepseek-v3.2",
+    thinking: true
+  },
+  "deepseek-3.2-nothink": {
+    id: "deepseek-ai/deepseek-v3.2",
+    thinking: false
+  },
+
+  // GLM 4.7
+  "glm4.7": {
+    id: "z-ai/glm4.7",
+    thinking: true
+  },
+  "glm4.7-nothink": {
+    id: "z-ai/glm4.7",
+    thinking: false
+  },
+
+  // GLM 5
+  "glm5": {
+    id: "z-ai/glm5",
+    thinking: true
+  },
+  "glm5-nothink": {
+    id: "z-ai/glm5",
+    thinking: false
+  }
 };
 
 // Health check
@@ -27,7 +56,7 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// (необязательно, но полезно) список моделей для Janitor
+// Список моделей для Janitor
 app.get("/v1/models", (req, res) => {
   res.json({
     object: "list",
@@ -43,10 +72,9 @@ app.get("/v1/models", (req, res) => {
 app.post("/v1/chat/completions", async (req, res) => {
   const { model, messages, temperature, max_tokens, stream } = req.body;
 
-  const nimModel = MODEL_MAPPING[model];
+  const modelConfig = MODEL_MAPPING[model];
 
-  // ❌ ЕСЛИ МОДЕЛИ НЕТ — ОШИБКА, А НЕ ПОДМЕНА
-  if (!nimModel) {
+  if (!modelConfig) {
     return res.status(400).json({
       error: {
         message: `Model "${model}" is not allowed or does not exist`,
@@ -54,6 +82,9 @@ app.post("/v1/chat/completions", async (req, res) => {
       }
     });
   }
+
+  const nimModel = modelConfig.id;
+  const thinkingEnabled = modelConfig.thinking;
 
   try {
     const response = await axios.post(
@@ -65,9 +96,10 @@ app.post("/v1/chat/completions", async (req, res) => {
         top_p: req.body.top_p ?? 0.9,
         max_tokens: max_tokens ?? 8192,
         stream: stream ?? false,
-        // thinking включаем ВСЕГДА — DeepSeek это умеет
         extra_body: {
-          chat_template_kwargs: { thinking: true }
+          chat_template_kwargs: {
+            thinking: thinkingEnabled
+          }
         }
       },
       {
@@ -79,7 +111,6 @@ app.post("/v1/chat/completions", async (req, res) => {
       }
     );
 
-    // Стрим просто прокидываем как есть
     if (stream) {
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -89,9 +120,8 @@ app.post("/v1/chat/completions", async (req, res) => {
       return;
     }
 
-    // Нестрима — приводим к OpenAI-формату
     res.json({
-      id: "chatcmpl-deepseek",
+      id: "chatcmpl-proxy",
       object: "chat.completion",
       created: Math.floor(Date.now() / 1000),
       model,
@@ -110,5 +140,5 @@ app.post("/v1/chat/completions", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log("DeepSeek proxy running on port", PORT);
+  console.log("NVIDIA NIM proxy running on port", PORT);
 });
