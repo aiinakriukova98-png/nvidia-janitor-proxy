@@ -1,6 +1,4 @@
-// server.js — Janitor → NVIDIA NIM Universal Bridge
-// GLM: native inference (true thinking toggle)
-// DeepSeek: OpenAI endpoint (reasoning toggle)
+// server.js — Janitor → NVIDIA NIM Universal Bridge (STABLE)
 
 const express = require("express");
 const axios = require("axios");
@@ -13,7 +11,6 @@ app.use(express.json({ limit: "50mb" }));
 const PORT = process.env.PORT || 3000;
 const NIM_API_KEY = process.env.NIM_API_KEY;
 
-// Endpoints
 const NIM_OPENAI_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
 
 const NIM_NATIVE_ENDPOINTS = {
@@ -21,9 +18,7 @@ const NIM_NATIVE_ENDPOINTS = {
   "glm5":   "https://api.nvcf.nvidia.com/v1/inference/z-ai/glm5"
 };
 
-// Model routing map
 const MODEL_MAPPING = {
-  // DeepSeek
   "deepseek-3.2": {
     type: "openai",
     id: "deepseek-ai/deepseek-v3.2",
@@ -35,7 +30,6 @@ const MODEL_MAPPING = {
     thinking: false
   },
 
-  // GLM
   "glm4.7": {
     type: "native",
     endpoint: NIM_NATIVE_ENDPOINTS["glm4.7"],
@@ -59,12 +53,6 @@ const MODEL_MAPPING = {
   }
 };
 
-// Health
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
-// Model list for Janitor
 app.get("/v1/models", (req, res) => {
   res.json({
     object: "list",
@@ -76,101 +64,92 @@ app.get("/v1/models", (req, res) => {
   });
 });
 
-// Convert messages → prompt (for native GLM)
 function buildPrompt(messages) {
   let prompt = "";
 
   for (const msg of messages) {
-    if (msg.role === "system") {
+    if (msg.role === "system")
       prompt += `<system>\n${msg.content}\n</system>\n\n`;
-    } else if (msg.role === "user") {
+    else if (msg.role === "user")
       prompt += `<user>\n${msg.content}\n</user>\n\n`;
-    } else if (msg.role === "assistant") {
+    else if (msg.role === "assistant")
       prompt += `<assistant>\n${msg.content}\n</assistant>\n\n`;
-    }
   }
 
   prompt += `<assistant>\n`;
   return prompt;
 }
 
-// Main endpoint
+function extractGLMText(data) {
+  if (!data) return "";
+
+  if (typeof data === "string") return data;
+
+  if (data.output_text) return data.output_text;
+
+  if (data.generated_text) return data.generated_text;
+
+  if (Array.isArray(data.outputs) && data.outputs[0]?.generated_text)
+    return data.outputs[0].generated_text;
+
+  if (Array.isArray(data.data) && data.data[0]?.text)
+    return data.data[0].text;
+
+  return JSON.stringify(data);
+}
+
 app.post("/v1/chat/completions", async (req, res) => {
   const { model, messages, temperature, max_tokens } = req.body;
 
   const cfg = MODEL_MAPPING[model];
-  if (!cfg) {
-    return res.status(400).json({
-      error: { message: `Unknown model: ${model}` }
-    });
-  }
+  if (!cfg) return res.status(400).json({ error: "Unknown model" });
 
   try {
 
-    // ---- DeepSeek via OpenAI NIM ----
     if (cfg.type === "openai") {
-      const payload = {
-        model: cfg.id,
-        messages,
-        temperature: temperature ?? 0.9,
-        top_p: req.body.top_p ?? 0.9,
-        max_tokens: max_tokens ?? 4096,
-        stream: false,
-        reasoning: cfg.thinking
-      };
-
       const response = await axios.post(
         NIM_OPENAI_ENDPOINT,
-        payload,
+        {
+          model: cfg.id,
+          messages,
+          temperature: temperature ?? 0.9,
+          max_tokens: max_tokens ?? 4096,
+          reasoning: cfg.thinking ? "medium" : "off"
+        },
         {
           headers: {
             Authorization: `Bearer ${NIM_API_KEY}`,
             "Content-Type": "application/json"
-          }
+          },
+          timeout: 180000
         }
       );
 
-      return res.json({
-        id: "chatcmpl-proxy",
-        object: "chat.completion",
-        created: Math.floor(Date.now() / 1000),
-        model,
-        choices: response.data.choices,
-        usage: response.data.usage
-      });
+      return res.json(response.data);
     }
-
-    // ---- GLM via native NIM ----
-    const prompt = buildPrompt(messages);
-
-    const payload = {
-      input: prompt,
-      parameters: {
-        max_new_tokens: max_tokens ?? 1024,
-        temperature: temperature ?? 0.9,
-        chat_template_kwargs: {
-          enable_thinking: cfg.thinking
-        }
-      }
-    };
 
     const response = await axios.post(
       cfg.endpoint,
-      payload,
+      {
+        input: buildPrompt(messages),
+        parameters: {
+          max_new_tokens: max_tokens ?? 1024,
+          temperature: temperature ?? 0.9,
+          chat_template_kwargs: {
+            enable_thinking: cfg.thinking
+          }
+        }
+      },
       {
         headers: {
           Authorization: `Bearer ${NIM_API_KEY}`,
           "Content-Type": "application/json"
         },
-        timeout: 300000
+        timeout: 180000
       }
     );
 
-    const text =
-      response.data?.output_text ||
-      response.data?.generated_text ||
-      response.data?.text ||
-      "";
+    const text = extractGLMText(response.data);
 
     res.json({
       id: "chatcmpl-native",
@@ -183,12 +162,7 @@ app.post("/v1/chat/completions", async (req, res) => {
           message: { role: "assistant", content: text },
           finish_reason: "stop"
         }
-      ],
-      usage: {
-        prompt_tokens: -1,
-        completion_tokens: -1,
-        total_tokens: -1
-      }
+      ]
     });
 
   } catch (err) {
