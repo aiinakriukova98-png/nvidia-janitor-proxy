@@ -17,8 +17,8 @@ const NIM_API_KEY = process.env.NIM_API_KEY;
 const NIM_OPENAI_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
 
 const NIM_NATIVE_ENDPOINTS = {
-  "glm4.7": "https://api.nvidia.com/v1/inference/z-ai/glm4.7",
-  "glm5":   "https://api.nvidia.com/v1/inference/z-ai/glm5"
+  "glm4.7": "https://api.nvcf.nvidia.com/v1/inference/z-ai/glm4.7",
+  "glm5":   "https://api.nvcf.nvidia.com/v1/inference/z-ai/glm5"
 };
 
 // Model routing map
