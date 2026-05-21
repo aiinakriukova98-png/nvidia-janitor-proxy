@@ -20,7 +20,10 @@ const NIM_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
 const MODEL_MAPPING = {
   "deepseek-3.2": "deepseek-ai/deepseek-v3.2",
   "glm4.7": "z-ai/glm4.7",
-  "glm5": "z-ai/glm5"
+  "glm5": "z-ai/glm5",
+  "glm5.1": "z-ai/glm-5.1",
+  "deepseek-v4flash": "deepseek-ai/deepseek-v4-flash",
+  "deepseek-v4pro": "deepseek-ai/deepseek-v4-pro",
 };
 
 // Health check
