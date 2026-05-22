@@ -104,13 +104,22 @@ app.post("/v1/chat/completions", async (req, res) => {
     });
 
   } catch (err) {
-    res.status(err.response?.status || 500).json({
-      error: {
-        message: err.response?.data || err.message,
-        type: "proxy_error"
-      }
-    });
-  }
+
+  console.error("NVIDIA ERROR:", err.response?.data || err.message);
+
+  res.status(err.response?.status || 500).json({
+    error: {
+      message:
+        typeof err.response?.data === "string"
+          ? err.response.data
+          : err.response?.data?.error?.message ||
+            err.message ||
+            "Unknown proxy error",
+
+      type: "proxy_error"
+    }
+  });
+}
 });
 
 app.listen(PORT, () => {
