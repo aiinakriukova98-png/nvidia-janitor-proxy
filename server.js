@@ -23,7 +23,7 @@ const MODEL_MAPPING = {
   "glm5": "z-ai/glm5",
   "glm5.1": "z-ai/glm-5.1",
   "deepseek-v4flash": "deepseek-ai/deepseek-v4-flash",
-  "deepseek-v4pro": "deepseek-ai/deepseek-v4-pro",
+  "deepseek-v4pro": "deepseek-ai/deepseek-v4-pro"
 };
 
 // Health check
