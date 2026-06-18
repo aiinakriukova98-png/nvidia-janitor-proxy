@@ -57,20 +57,27 @@ app.post("/v1/chat/completions", async (req, res) => {
   }
 
   try {
-    const response = await axios.post(
-      NIM_ENDPOINT,
-      {
-        model: nimModel,
-        messages,
-        temperature: temperature ?? 0.9,
-        top_p: req.body.top_p ?? 0.9,
-        max_tokens: max_tokens ?? 8192,
-        stream: stream ?? false,
-        // thinking включаем ВСЕГДА — DeepSeek это умеет
-        extra_body: {
-          chat_template_kwargs: { thinking: true }
-        }
-      },
+    const payload = {
+  model: nimModel,
+  messages,
+  temperature: temperature ?? 0.9,
+  top_p: req.body.top_p ?? 0.9,
+  max_tokens: max_tokens ?? 8192,
+  stream: stream ?? false
+};
+
+// Только для DeepSeek
+if (nimModel.startsWith("deepseek-ai/")) {
+  payload.extra_body = {
+    chat_template_kwargs: {
+      thinking: true
+    }
+  };
+}
+
+const response = await axios.post(
+  NIM_ENDPOINT,
+  payload,
       {
         headers: {
           Authorization: `Bearer ${NIM_API_KEY}`,
